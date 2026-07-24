@@ -1,13 +1,15 @@
 import streamlit as st
 from groq import Groq
 import urllib.parse
+import random
+import time
 from huggingface_hub import InferenceClient
 
 # Page Config
 st.set_page_config(page_title="Sidhu Moose Wala AI Studio", page_icon="🎤", layout="centered")
 
 st.title("🎤 Sidhu Moose Wala AI Song Generator (FREE)")
-st.markdown("Apna topic likhein — Free AI Lyrics, Music Beat, aur Custom Poster Image generate karein!")
+st.markdown("Apna topic likhein — AI Lyrics, Music Beat Audio, aur Custom HD Poster Image generate karein!")
 
 # API Keys from Streamlit Secrets
 GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", "")
@@ -27,7 +29,7 @@ OUTPUT FORMAT REQUIREMENTS:
 # User Input
 user_prompt = st.text_area("✍️ Song ka Topic ya Idea likhein:", placeholder="e.g. Doston ki yaari, mehnat aur aggressive drill beat song...", height=100)
 
-if st.button("🚀 Free Song & Poster Generate Karein", type="primary"):
+if st.button("🚀 Song & Picture Generate Karein", type="primary"):
     if not user_prompt:
         st.warning("Meharbani karke pehle koi prompt likhein!")
     elif not GROQ_API_KEY:
@@ -52,36 +54,52 @@ if st.button("🚀 Free Song & Poster Generate Karein", type="primary"):
             st.text_area("📜 Generated Song Script:", value=generated_script, height=220)
 
             # -------------------------------------------------------------
-            # STEP 2: Song Poster Image Generation (Pollinations)
+            # STEP 2: Unique Sidhu Moose Wala Poster (Random Seed)
             # -------------------------------------------------------------
-            with st.spinner("🖼️ 2/3: Sidhu Style AI Poster generate ho raha hai..."):
-                image_prompt = f"Album cover poster of Punjabi singer in Sidhu Moose Wala style, luxury dark car, aggressive street style, dark cinematic, {user_prompt}"
+            with st.spinner("🖼️ 2/3: Nayi Sidhu Moose Wala HD Picture generate ho rahi hai..."):
+                # Har baar random seed se NAYI picture banegi
+                random_seed = random.randint(1, 999999)
+                
+                image_prompt = (
+                    f"Album cover poster of Punjabi singer Sidhu Moose Wala, {user_prompt}, "
+                    f"wearing stylish turban and dark sunglasses, standing near black SUV 4x4 car, "
+                    f"aggressive look, cinematic lighting, ultra detailed 8k portrait"
+                )
                 encoded_prompt = urllib.parse.quote(image_prompt)
-                free_image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true&seed=42"
+                
+                # Dynamic URL with random seed
+                free_image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true&seed={random_seed}"
                 
                 st.subheader("🖼️ Generated Song Poster:")
-                st.image(free_image_url, caption="AI Song Poster", use_container_width=True)
+                st.image(free_image_url, caption="AI Song Poster (New)", use_container_width=True)
 
             # -------------------------------------------------------------
-            # STEP 3: Audio/Music Generation (Hugging Face Official Client)
+            # STEP 3: Audio Generation with Retry Logic
             # -------------------------------------------------------------
-            with st.spinner("🎙️ 3/3: Music Track generate ho raha hai..."):
+            with st.spinner("🎙️ 3/3: Music Track generate ho raha hai (Wait 10-15 secs)..."):
                 if HF_TOKEN:
-                    try:
-                        hf_client = InferenceClient(token=HF_TOKEN)
-                        audio_prompt = f"Punjabi drill hiphop beat, 808 bass, dark synth, aggressive style, {user_prompt}"
-                        
-                        audio_bytes = hf_client.text_to_audio(
-                            audio_prompt,
-                            model="facebook/musicgen-small"
-                        )
-                        
-                        st.subheader("🔊 Final AI Audio Track:")
-                        st.audio(audio_bytes, format="audio/flac")
-                    except Exception as audio_err:
-                        st.warning("💡 Audio server par load hai. Script aur HD Poster ready hain!")
+                    hf_client = InferenceClient(token=HF_TOKEN)
+                    audio_prompt = f"Punjabi drill hiphop beat, 808 bass, dark synth, energetic, {user_prompt}"
+                    
+                    audio_success = False
+                    # Retrying up to 3 times in case HF server is warming up
+                    for attempt in range(3):
+                        try:
+                            audio_bytes = hf_client.text_to_audio(
+                                audio_prompt,
+                                model="facebook/musicgen-small"
+                            )
+                            st.subheader("🔊 Final AI Audio Track:")
+                            st.audio(audio_bytes, format="audio/wav")
+                            audio_success = True
+                            break
+                        except Exception:
+                            time.sleep(5) # Wait 5 seconds before retrying
+                    
+                    if not audio_success:
+                        st.warning("⚠️ Audio server filhal busy hai. Kucch der baad dobara 'Generate' button dabayein.")
                 else:
-                    st.info("💡 Tip: Secrets mein HF_TOKEN add karne par direct Music audio player chal jayega.")
+                    st.info("💡 Tip: Streamlit Secrets mein HF_TOKEN add karein taaki Audio Player active ho jaye.")
 
         except Exception as e:
             st.error(f"Error aaya hai: {str(e)}")
