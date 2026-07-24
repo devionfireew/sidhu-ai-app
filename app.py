@@ -1,19 +1,20 @@
 import streamlit as st
 from groq import Groq
-import replicate
+import requests
+import urllib.parse
+import time
 
 # Page Config
 st.set_page_config(page_title="Sidhu Moose Wala AI Studio", page_icon="🎤", layout="centered")
 
-# Title & Description
-st.title("🎤 Sidhu Moose Wala AI Song & Poster Generator")
-st.markdown("Apna topic likhein — AI Lyrics, Punjabi Beat Audio, aur Custom Song Poster ek saath generate karein!")
+st.title("🎤 Sidhu Moose Wala AI Song Generator (FREE)")
+st.markdown("Apna topic likhein — Free AI Lyrics, Music Beat, aur Custom Poster Image generate karein!")
 
 # API Keys from Streamlit Secrets
 GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", "")
-REPLICATE_API_TOKEN = st.secrets.get("REPLICATE_API_TOKEN", "")
+HF_TOKEN = st.secrets.get("HF_TOKEN", "") # Hugging Face Free Token
 
-# System Prompt for Lyrics
+# System Prompt
 SYSTEM_PROMPT = """
 You are an elite Punjabi Music Lyricist specialized in creating songs in the signature style, flow, lyrics, and vocal delivery of Sidhu Moose Wala.
 
@@ -25,21 +26,19 @@ OUTPUT FORMAT REQUIREMENTS:
 """
 
 # User Input
-user_prompt = st.text_area("✍️ Song ka Topic ya Idea likhein:", placeholder="e.g. Mere doston ki yaari, mehnat, aur dushmano ke liye aggressive drill song...", height=100)
+user_prompt = st.text_area("✍️ Song ka Topic ya Idea likhein:", placeholder="e.g. Doston ki yaari, mehnat aur aggressive drill beat song...", height=100)
 
-if st.button("🚀 Complete Song & Picture Generate Karein", type="primary"):
+if st.button("🚀 Free Song & Poster Generate Karein", type="primary"):
     if not user_prompt:
         st.warning("Meharbani karke pehle koi prompt likhein!")
     elif not GROQ_API_KEY:
         st.error("GROQ_API_KEY missing hai! Streamlit Secrets mein add karein.")
-    elif not REPLICATE_API_TOKEN:
-        st.error("REPLICATE_API_TOKEN missing hai! Streamlit Secrets mein add karein.")
     else:
         try:
             # -------------------------------------------------------------
-            # STEP 1: Lyrics & Script Generation (Groq API)
+            # STEP 1: Lyrics Generation (Groq API - Free)
             # -------------------------------------------------------------
-            with st.spinner("⚡ 1/3: AI Lyrics aur Beat Script generate ho rahe hain..."):
+            with st.spinner("⚡ 1/3: AI Lyrics generate ho rahe hain..."):
                 client = Groq(api_key=GROQ_API_KEY)
                 chat_completion = client.chat.completions.create(
                     messages=[
@@ -51,45 +50,41 @@ if st.button("🚀 Complete Song & Picture Generate Karein", type="primary"):
                 generated_script = chat_completion.choices[0].message.content
 
             st.success("✅ Lyrics Script Tayar Hai!")
-            st.text_area("📜 Generated Song Script:", value=generated_script, height=250)
+            st.text_area("📜 Generated Song Script:", value=generated_script, height=220)
 
             # -------------------------------------------------------------
-            # STEP 2: Song Cover Picture Generation (Replicate Flux Model)
+            # STEP 2: Song Poster Image Generation (Pollinations - 100% Free)
             # -------------------------------------------------------------
-            with st.spinner("🖼️ 2/3: Sidhu Moose Wala Style AI Poster Image generate ho rahi hai..."):
-                image_prompt = (
-                    f"Album cover poster of a confident Punjabi hip hop singer inspired by Sidhu Moose Wala style, "
-                    f"standing near luxury dark SUV car, aggressive street style, dark cinematic lighting, 8k resolution, "
-                    f"theme: {user_prompt}"
-                )
-                image_output = replicate.run(
-                    "black-forest-labs/flux-schnell",
-                    input={"prompt": image_prompt}
-                )
+            with st.spinner("🖼️ 2/3: Sidhu Style AI Poster generate ho raha hai..."):
+                image_prompt = f"Album cover poster of Punjabi singer in Sidhu Moose Wala style, luxury dark car, aggressive street style, dark cinematic, {user_prompt}"
+                encoded_prompt = urllib.parse.quote(image_prompt)
                 
-                st.subheader("🖼️ Generated Song Cover Poster:")
-                # Handle list or single string response from Replicate
-                if isinstance(image_output, list) and len(image_output) > 0:
-                    st.image(image_output[0], caption="AI Song Poster", use_container_width=True)
-                else:
-                    st.image(image_output, caption="AI Song Poster", use_container_width=True)
+                # Free Image URL (No API key required)
+                free_image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true&seed=42"
+                
+                st.subheader("🖼️ Generated Song Poster (Free):")
+                st.image(free_image_url, caption="AI Song Poster", use_container_width=True)
 
             # -------------------------------------------------------------
-            # STEP 3: Audio & Beat Track Generation (Replicate MusicGen)
+            # STEP 3: Audio/Music Generation (Hugging Face MusicGen - Free)
             # -------------------------------------------------------------
-            with st.spinner("🎙️ 3/3: AI Music & Voice Audio Track generate ho raha hai..."):
-                audio_prompt = f"Aggressive Punjabi drill hiphop beat, 808 bass, dark synth, fast Punjabi vocal flow, topic: {user_prompt}"
-                audio_output = replicate.run(
-                    "meta/musicgen:67198c23f0481d2a132420a72c3d5e2193b22ed7c813be6a77d853e8dd2c505d",
-                    input={
-                        "prompt": audio_prompt,
-                        "model_version": "encodec_32khz",
-                        "output_format": "mp3",
-                        "duration": 12
+            with st.spinner("🎙️ 3/3: Music Track generate ho raha hai..."):
+                if HF_TOKEN:
+                    API_URL = "https://api-inference.huggingface.co/models/facebook/musicgen-small"
+                    headers = {"Authorization": f"Bearer {HF_TOKEN}"}
+                    audio_payload = {
+                        "inputs": f"Punjabi drill hiphop beat, 808 bass, dark synth, aggressive style, {user_prompt}"
                     }
-                )
-                st.subheader("🔊 Final AI Audio Track:")
-                st.audio(audio_output)
+                    
+                    response = requests.post(API_URL, headers=headers, json=audio_payload)
+                    
+                    if response.status_code == 200:
+                        st.subheader("🔊 Final AI Audio Track:")
+                        st.audio(response.content, format="audio/wav")
+                    else:
+                        st.info("💡 Hugging Face Model load ho raha hai, script aur image ready hain!")
+                else:
+                    st.info("💡 Tip: Free Hugging Face Token add karne par direct Music audio track bhi play hoga.")
 
         except Exception as e:
             st.error(f"Error aaya hai: {str(e)}")
