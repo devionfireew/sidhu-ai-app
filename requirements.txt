@@ -1,4 +1,4 @@
 streamlit
 groq
-replicate
 requests
+huggingface_hub
