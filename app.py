@@ -1,8 +1,7 @@
 import streamlit as st
 from groq import Groq
-import requests
 import urllib.parse
-import time
+from huggingface_hub import InferenceClient
 
 # Page Config
 st.set_page_config(page_title="Sidhu Moose Wala AI Studio", page_icon="🎤", layout="centered")
@@ -12,7 +11,7 @@ st.markdown("Apna topic likhein — Free AI Lyrics, Music Beat, aur Custom Poste
 
 # API Keys from Streamlit Secrets
 GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", "")
-HF_TOKEN = st.secrets.get("HF_TOKEN", "") # Hugging Face Free Token
+HF_TOKEN = st.secrets.get("HF_TOKEN", "")
 
 # System Prompt
 SYSTEM_PROMPT = """
@@ -36,7 +35,7 @@ if st.button("🚀 Free Song & Poster Generate Karein", type="primary"):
     else:
         try:
             # -------------------------------------------------------------
-            # STEP 1: Lyrics Generation (Groq API - Free)
+            # STEP 1: Lyrics Generation (Groq API)
             # -------------------------------------------------------------
             with st.spinner("⚡ 1/3: AI Lyrics generate ho rahe hain..."):
                 client = Groq(api_key=GROQ_API_KEY)
@@ -53,38 +52,36 @@ if st.button("🚀 Free Song & Poster Generate Karein", type="primary"):
             st.text_area("📜 Generated Song Script:", value=generated_script, height=220)
 
             # -------------------------------------------------------------
-            # STEP 2: Song Poster Image Generation (Pollinations - 100% Free)
+            # STEP 2: Song Poster Image Generation (Pollinations)
             # -------------------------------------------------------------
             with st.spinner("🖼️ 2/3: Sidhu Style AI Poster generate ho raha hai..."):
                 image_prompt = f"Album cover poster of Punjabi singer in Sidhu Moose Wala style, luxury dark car, aggressive street style, dark cinematic, {user_prompt}"
                 encoded_prompt = urllib.parse.quote(image_prompt)
-                
-                # Free Image URL (No API key required)
                 free_image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true&seed=42"
                 
-                st.subheader("🖼️ Generated Song Poster (Free):")
+                st.subheader("🖼️ Generated Song Poster:")
                 st.image(free_image_url, caption="AI Song Poster", use_container_width=True)
 
             # -------------------------------------------------------------
-            # STEP 3: Audio/Music Generation (Hugging Face MusicGen - Free)
+            # STEP 3: Audio/Music Generation (Hugging Face Official Client)
             # -------------------------------------------------------------
             with st.spinner("🎙️ 3/3: Music Track generate ho raha hai..."):
                 if HF_TOKEN:
-                    API_URL = "https://api-inference.huggingface.co/models/facebook/musicgen-small"
-                    headers = {"Authorization": f"Bearer {HF_TOKEN}"}
-                    audio_payload = {
-                        "inputs": f"Punjabi drill hiphop beat, 808 bass, dark synth, aggressive style, {user_prompt}"
-                    }
-                    
-                    response = requests.post(API_URL, headers=headers, json=audio_payload)
-                    
-                    if response.status_code == 200:
+                    try:
+                        hf_client = InferenceClient(token=HF_TOKEN)
+                        audio_prompt = f"Punjabi drill hiphop beat, 808 bass, dark synth, aggressive style, {user_prompt}"
+                        
+                        audio_bytes = hf_client.text_to_audio(
+                            audio_prompt,
+                            model="facebook/musicgen-small"
+                        )
+                        
                         st.subheader("🔊 Final AI Audio Track:")
-                        st.audio(response.content, format="audio/wav")
-                    else:
-                        st.info("💡 Hugging Face Model load ho raha hai, script aur image ready hain!")
+                        st.audio(audio_bytes, format="audio/flac")
+                    except Exception as audio_err:
+                        st.warning("💡 Audio server par load hai. Script aur HD Poster ready hain!")
                 else:
-                    st.info("💡 Tip: Free Hugging Face Token add karne par direct Music audio track bhi play hoga.")
+                    st.info("💡 Tip: Secrets mein HF_TOKEN add karne par direct Music audio player chal jayega.")
 
         except Exception as e:
             st.error(f"Error aaya hai: {str(e)}")
